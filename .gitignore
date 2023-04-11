@@ -1,0 +1,8 @@
+
+*.ts
+cmd/ffmpeg
+cmd/ffprobe
+cmd/main.exe.zip
+*.exe
+*.zip
+cmd/download/SSSC_HowDoesItWork_.mp4
