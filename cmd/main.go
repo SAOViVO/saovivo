@@ -326,21 +326,25 @@ func main() {
 	}
 
 	if !saovivo.ExistBinaryFile() {
-		fmt.Printf("Downloading ffmpeg, wait...")
-		if _, err := ffbinaries.Download("ffmpeg", "", ""); err != nil {
-			fmt.Printf("Error: %v", err)
-			return
-		}
-		fmt.Printf("[Done]\n")
+		go func() {
+			fmt.Printf("Downloading ffmpeg, wait...\n")
+			if _, err := ffbinaries.Download("ffmpeg", "", ""); err != nil {
+				fmt.Printf("Error: %v", err)
+				return
+			}
+			fmt.Printf("ffmpeg [Done]\n")
+		}()
 	}
 
 	if !streaminfo.ExistBinaryFile() {
-		fmt.Printf("Downloading ffprobe, wait...")
-		if _, err := ffbinaries.Download("ffprobe", "", ""); err != nil {
-			fmt.Printf("Error: %v", err)
-			return
-		}
-		fmt.Printf("[Done]\n")
+		go func() {
+			fmt.Printf("Downloading ffprobe, wait...\n")
+			if _, err := ffbinaries.Download("ffprobe", "", ""); err != nil {
+				fmt.Printf("Error: %v", err)
+				return
+			}
+			fmt.Printf("ffprobe [Done]\n")
+		}()
 	}
 
 	fmt.Println("Starting Server")
