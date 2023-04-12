@@ -1,5 +1,7 @@
 # Repositorio del servidor SAOViVO
 
+![alt text](https://github.com/SAOViVO/saovivo/raw/main/saovivo.png)
+
 - Lenguaje: Golang
 
 # Compilacion
