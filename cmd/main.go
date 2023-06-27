@@ -24,7 +24,7 @@ import (
 //go:embed build
 var build embed.FS
 
-var version = "1.0.0"
+var version = "1.0.1"
 
 type VideoServer struct {
 	playlist      *saovivo.Playlist
