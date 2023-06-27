@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"saovivo"
 	"streaminfo"
+	"strings"
 	"sync"
 	"time"
 )
@@ -23,14 +24,18 @@ import (
 //go:embed build
 var build embed.FS
 
+var version = "1.0.0"
+
 type VideoServer struct {
-	playlist *saovivo.Playlist
-	vc       *saovivo.VideoChannel
-	receiver *saovivo.FileReceiver
-	output   string
-	status   string
-	lock     *sync.Mutex
-	storage  string
+	playlist      *saovivo.Playlist
+	vc            *saovivo.VideoChannel
+	receiver      *saovivo.FileReceiver
+	output        string
+	status        string
+	loop          bool
+	lock          *sync.Mutex
+	storage       string
+	notifications []string
 }
 
 func NewVideoServer(storage string, download string) *VideoServer {
@@ -39,6 +44,7 @@ func NewVideoServer(storage string, download string) *VideoServer {
 	vs.status = "stop"
 	vs.playlist = saovivo.NewPlaylist()
 	vs.storage = storage
+	vs.loop = true
 	vs.receiver = saovivo.NewFileReceiver(download)
 	return &vs
 }
@@ -57,25 +63,45 @@ func (vs *VideoServer) start() error {
 			var asset *saovivo.Asset
 			for {
 				vs.lock.Lock()
+				if vs.playlist.InQueue() == 0 && !vs.loop {
+					vs.status = "stop"
+				}
 				if vs.status != "stop" {
 					asset = vs.playlist.Shift(false)
 				} else {
 					asset = vs.playlist.Shift(true)
 				}
+				fmt.Println("Empieza la reproduccion de: ", asset)
 				vs.lock.Unlock()
 				if asset != nil {
 					vs.vc.Input <- &(asset.Video)
 					err := <-vs.vc.Output
+					fmt.Printf("Output from Video Channel: %v\n", err)
 					if err != nil {
 						if fmt.Sprint(err) == "Abort" {
 							vs.lock.Lock()
 							vs.status = "stop"
+							vs.playlist.Shift(true)
+							vs.vc = nil
+							vs.lock.Unlock()
+							return
+						} else if fmt.Sprint(err) == "Ingest" {
+							fmt.Println("Fallo la ingesta")
+							vs.lock.Lock()
+							vs.notifications = append(vs.notifications, fmt.Sprintf("El video <b>%s</b> no se pudo reproducir por un error en la API de Youtube", asset.Name))
+							fmt.Println(vs.notifications)
 							vs.lock.Unlock()
 						} else {
+							fmt.Println("Estoy aca, esperando no se que")
 							vs.vc, _ = saovivo.NewVideoChannel(vs.output, vs.storage)
 						}
 					}
 				} else {
+					select {
+					case vs.vc.Input <- nil:
+						<-vs.vc.Output
+					default:
+					}
 					vs.vc = nil
 					return
 				}
@@ -121,7 +147,9 @@ func (vs *VideoServer) Json() (*bytes.Buffer, error) {
 	m := vs.playlist.Map()
 	m["output"] = vs.output
 	m["status"] = vs.status
-
+	m["loop"] = vs.loop
+	m["notifications"] = vs.notifications
+	vs.notifications = []string{}
 	data, e := json.Marshal(m)
 	if e != nil {
 		return nil, e
@@ -144,6 +172,17 @@ func (vs *VideoServer) HttpMethodPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	for key, value := range body {
 		switch key {
+		case "loop":
+			vs.lock.Lock()
+			vs.loop = value.(bool)
+			text := ""
+			if !vs.loop {
+				text = "La repetición de la lista está <b>DESACTIVADA</b>, el stream terminará al finalizar el ultimo video de la lista"
+			} else {
+				text = "La repetición de la lista está <b>ACTIVADA</b>, el stream volverá a reproducir el primer video de la lista, cuando finalice el último"
+			}
+			vs.lock.Unlock()
+			setResponse(w, "message", text)
 		case "output":
 			vs.setOutput("rtmp://a.rtmp.youtube.com/live2/" + value.(string))
 			setResponse(w, "message", fmt.Sprintf("Destino de transmision: %s", value.(string)))
@@ -156,11 +195,11 @@ func (vs *VideoServer) HttpMethodPatch(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			vs.lock.Lock()
-			ret := vs.playlist.MoveByAssetIdToPosition(id, int(position.(float64)))
-			vs.playlist.Dump()
-			fmt.Println("RET --------------------------: ", ret)
+			vs.playlist.MoveByAssetIdToPosition(id, int(position.(float64)))
+
+			name := vs.playlist.GetAssetNameById(id)
 			vs.lock.Unlock()
-			setResponse(w, "message", fmt.Sprintf("Nueva posicion %d para el video %s", int(position.(float64)), id))
+			setResponse(w, "message", fmt.Sprintf("Nueva posición %d para el video <b>%s</b>", int(position.(float64)), name))
 		}
 	}
 }
@@ -178,13 +217,22 @@ func (vs *VideoServer) HttpMethodPost(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+	if !strings.HasPrefix(url, "http") {
+		url = "http://" + url
+	}
 	asset, err := vs.receiver.GetRemote(url)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		setResponse(w, "error", fmt.Sprintf("%v", err))
 		return
 	}
-	vs.appendToPlaylist(asset)
+	for _, a := range asset {
+		vs.appendToPlaylist(a)
+		vs.lock.Lock()
+		vs.notifications = append(vs.notifications, fmt.Sprintf("El video <b>%s</b> ha sido agregado a la lista de reproducción", a.Name))
+		vs.lock.Unlock()
+	}
+
 }
 
 func (vs *VideoServer) HttpMethodPut(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +266,7 @@ func (vs *VideoServer) HttpMethodPut(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			setResponse(w, "message", "Reproduccion finalizada")
+			setResponse(w, "message", "Reproducción finalizada")
 		}
 
 	} else {
@@ -250,9 +298,10 @@ func (vs *VideoServer) HttpMethodDelete(w http.ResponseWriter, r *http.Request) 
 			setResponse(w, "message", "No se pudo borrar la playlist porque se encuentra en play")
 		}
 	} else {
+		name := vs.playlist.GetAssetNameById(value)
 		b := vs.playlist.Remove(value)
 		if b {
-			setResponse(w, "message", "se elimino un nuevo item de la lista de reproduccion")
+			setResponse(w, "message", fmt.Sprintf("Se eliminó <b>%s</b> de la lista de reproducción", name))
 		} else {
 			setResponse(w, "error", "item no se ha podido eliminar el item")
 			w.WriteHeader(http.StatusBadRequest)
@@ -284,13 +333,20 @@ func (vs *VideoServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		notif := []string{}
 		for _, a := range assets {
 			vs.appendToPlaylist(a)
+
+			notif = append(notif, fmt.Sprintf("El video <b>%s</b> ha sido agregado a la lista de reproducción", a.Name))
+
 		}
 		buf, _ := vs.Json()
-		setResponse(w, "message", "Se agregaron nuevos videos a la reproduccion")
+		//setResponse(w, "message", "Se agregaron nuevos videos a la reproduccion")
 
 		io.Copy(w, buf)
+		vs.lock.Lock()
+		vs.notifications = notif
+		vs.lock.Unlock()
 		//		w.WriteHeader(http.StatusCreated)
 	case "OPTIONS":
 		return
@@ -299,6 +355,20 @@ func (vs *VideoServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		io.Copy(w, buf)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func versionHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, PUT, PATCH, DELETE")
+	m := make(map[string]string)
+	m["version"] = version
+	data, e := json.Marshal(m)
+	if e == nil {
+		w.Write(data)
+	} else {
+		setResponse(w, "error", "error encoding version")
 	}
 }
 
@@ -350,6 +420,7 @@ func main() {
 	fmt.Println("Starting Server")
 	videoServer := NewVideoServer(assets, download)
 	mux := http.NewServeMux()
+	mux.HandleFunc("/version", versionHandler)
 	mux.Handle("/playlist", videoServer)
 	mux.Handle("/playlist/remote", videoServer)
 	build, err := fs.Sub(build, "build")
@@ -357,22 +428,25 @@ func main() {
 		fmt.Printf("Error: %v", err)
 	}
 
-	browser := ""
-	if runtime.GOOS == "windows" {
-		browser = "explorer"
-	} else {
-		browser = "open"
-	}
-	fmt.Println("Starting Browser...")
-	go func() {
-		time.Sleep(3 * time.Second)
-		cmd := exec.Command(browser, "http://127.0.0.1:4000")
-		cmd.Run()
-	}()
+	port := "4000"
+	if runtime.GOOS != "linux" {
+		browser := ""
+		if runtime.GOOS == "windows" {
+			browser = "explorer"
+		} else {
+			browser = "open"
+		}
+		fmt.Println("Starting Browser...")
+		go func() {
+			time.Sleep(5 * time.Second)
+			cmd := exec.Command(browser, "http://127.0.0.1:4000")
+			cmd.Run()
+		}()
+		fmt.Println("Wait 10 seconds or go to http://127.0.0.1:4000")
 
-	fmt.Println("Wait 10 seconds or go to http://127.0.0.1:4000")
+	}
 
 	mux.Handle("/", http.FileServer(http.FS(build)))
-	err = http.ListenAndServe(":4000", mux)
+	err = http.ListenAndServe(":"+port, mux)
 	log.Fatal(err)
 }

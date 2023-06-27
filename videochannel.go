@@ -13,7 +13,9 @@ type VideoChannel struct {
 }
 
 func (v *VideoChannel) Stop() {
+	lout.Println("Stoping video channel")
 	v.Abort <- true
+	lout.Println("Stoped video channel")
 }
 
 func NewVideoChannel(rtmpOutput string, storage string) (*VideoChannel, error) {
@@ -29,6 +31,7 @@ func NewVideoChannel(rtmpOutput string, storage string) (*VideoChannel, error) {
 	go func() {
 		lout.Println("VideoChannel: Start")
 		for {
+			lout.Println("VideoChannel: loop")
 			var (
 				video     *VideoFile
 				ingest    *VideoIngest
@@ -40,19 +43,21 @@ func NewVideoChannel(rtmpOutput string, storage string) (*VideoChannel, error) {
 			case video = <-channel:
 			case end = <-abort:
 			}
+			lout.Println("VideoChannel: video", video, end)
 			if video == nil || end {
 				rtmp.Input <- nil // Signal to end
 				<-rtmp.Output     // Wait end
 				output <- nil     // Own signal to say goodbye
 				goto end_loop
 			}
+
 			videoLocal := filepath.Join(storage, video.Local)
 			if _, err := os.Stat(videoLocal); err != nil {
 				lout.Println("VideoChannel: local files does not exist, creating new ingest job")
 				ingest, err = NewVideoIngest(video.Remote, videoLocal)
 				if err != nil {
 					lerr.Printf("VideoChannel: impossible to create a new ingest job: %v", err)
-					output <- err
+					output <- fmt.Errorf("Ingest")
 					continue
 				}
 				ingestRun = true
@@ -62,11 +67,11 @@ func NewVideoChannel(rtmpOutput string, storage string) (*VideoChannel, error) {
 				rc, err := os.Open(videoLocal)
 				if err != nil {
 					lerr.Printf("VideoChannel: processing local file with errors: %v", err)
+					output <- fmt.Errorf("Ingest")
 					continue
 				}
 				rtmp.Input <- rc
 			}
-
 			select {
 			case <-abort:
 				lout.Printf("VideoChannel: abort operation.")
@@ -80,14 +85,21 @@ func NewVideoChannel(rtmpOutput string, storage string) (*VideoChannel, error) {
 				output <- fmt.Errorf("Abort")
 				goto end_loop
 			case re := <-rtmp.Output:
-				lout.Printf("VideoChannel: rtmp return")
-				if ingestRun {
-					<-ingest.Output
-				}
-				output <- re
+				lout.Printf("VideoChannel: rtmp return %v", re)
 				if re != nil {
 					lerr.Printf("VideoChannel: rtmp output with errors: %v", re)
+					output <- fmt.Errorf("Abort")
 					goto end_loop
+				}
+				if ingestRun {
+					e := <-ingest.Output
+					if e != nil {
+						output <- fmt.Errorf("Ingest")
+					} else {
+						output <- re
+					}
+				} else {
+					output <- re
 				}
 			}
 		}

@@ -1,9 +1,11 @@
 package saovivo
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 )
 
 type chunk struct {
@@ -90,7 +92,9 @@ func getChunk(uri string, c *chunk) error {
 	if err != nil {
 		return err
 	}
-
+	if rsp.StatusCode != http.StatusPartialContent {
+		return fmt.Errorf("http getChunk response: %d", rsp.StatusCode)
+	}
 	c.Buf, err = io.ReadAll(rsp.Body)
 	if err != nil {
 		return err
@@ -98,15 +102,25 @@ func getChunk(uri string, c *chunk) error {
 	return nil
 }
 
-func chunkDownloadThread(uri string, output chan chunk, err chan error, chunks []chunk) {
+func chunkDownloadThread(uri string, output chan chunk, err chan error, abort chan bool, chunks []chunk, wg *sync.WaitGroup) {
 	go func() {
-		defer func() { recover() }()
-		for i, _ := range chunks {
+		defer wg.Done()
+		for i := range chunks {
+			select {
+			case <-abort:
+				return
+			default:
+			}
 			if e := getChunk(uri, &chunks[i]); e != nil {
 				err <- e
 				return
 			}
-			output <- chunks[i]
+			select {
+			case output <- chunks[i]:
+				continue
+			case <-abort:
+				return
+			}
 		}
 	}()
 }
@@ -119,37 +133,64 @@ func multiThreadDownload(dst io.Writer, uri string, length int, threads int) err
 		return err
 	}
 
+	var wg sync.WaitGroup
+
 	total := len(chunks)
 	output := make(chan chunk, threads*5)
-	cerr := make(chan error)
+	cerr := make(chan error, threads)
+	abort := make(chan bool, threads)
 
 	c := shuffleChunks(chunks, threads)
 	for i := 0; i < threads; i++ {
-		chunkDownloadThread(uri, output, cerr, c[i])
+		wg.Add(1)
+		chunkDownloadThread(uri, output, cerr, abort, c[i], &wg)
 	}
 
 	expected := 0
-
+	retErr := error(nil)
 	for {
 		select {
 		case d := <-output:
 			if d.N != expected {
 				order[d.N] = &d
 			} else {
-				dst.Write(d.Buf)
+				_, e := dst.Write(d.Buf)
+				if e != nil {
+					retErr = e
+					goto exit
+				}
 				expected = expected + 1
 				for ; order[expected] != nil; expected = expected + 1 {
-					dst.Write(order[expected].Buf)
+					_, e := dst.Write(order[expected].Buf)
+					if e != nil {
+						retErr = e
+						goto exit
+					}
 				}
 			}
 			if expected == total {
 				return nil
 			}
 		case e := <-cerr:
-			close(output)
-			close(cerr)
-			return e
+			retErr = e
+			goto exit
 		}
 	}
-	return nil
+exit:
+	for i := 0; i < threads; i++ {
+		abort <- true
+	}
+	fmt.Println("Esperando que terminen todos los hilos ", cap(output), len(output), cap(abort), len(abort), cap(cerr), len(cerr))
+	wg.Wait()
+	fmt.Println("Todos los hilos terminaron")
+	return retErr
+}
+
+func Download(dst io.Writer, uri string) error {
+	if b, s, e := supportRangeDownload(uri); b {
+		fmt.Println(b, s, e)
+		return multiThreadDownload(dst, uri, s, 3)
+	} else {
+		return e
+	}
 }

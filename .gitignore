@@ -8,3 +8,8 @@ cmd/main.exe.zip
 cmd/download/SSSC_HowDoesItWork_.mp4
 *.md
 cmd/pragma solidity ^0.8.0;
+cmd2/.DS_Store
+cmd2/ffmpeg
+cmd2/main
+cmd2/main.go
+cmd/saovivo

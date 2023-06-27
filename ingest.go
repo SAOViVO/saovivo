@@ -1,6 +1,7 @@
 package saovivo
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -35,7 +36,28 @@ func (v *VideoIngest) Dst() string {
 	return v.dst
 }
 
-func isYoutubeVideo(uri string) bool {
+func isYoutubePlaylist(uri string) *youtube.Playlist {
+	if isYoutubeDomain(uri) {
+		client := youtube.Client{}
+		playlist, err := client.GetPlaylist(uri)
+		if err == nil {
+			return playlist
+		}
+	}
+	return nil
+}
+
+func getYoutubeUrlsFromPlaylist(playlist *youtube.Playlist) []string {
+	urls := []string{}
+	if playlist != nil {
+		for _, v := range playlist.Videos {
+			urls = append(urls, "https://www.youtube.com/watch?v="+v.ID)
+		}
+	}
+	return urls
+}
+
+func isYoutubeDomain(uri string) bool {
 	url, err := url.Parse(uri)
 	if err != nil {
 		return false
@@ -68,8 +90,8 @@ func sendToWriter(dst io.Writer, uri string, localfile bool) error {
 			return err
 		}
 		if accept {
-			if e := multiThreadDownload(dst, uri, length, 10); e != nil {
-				return nil
+			if e := multiThreadDownload(dst, uri, length, 3); e != nil {
+				return e
 			}
 		} else {
 			client := &http.Client{}
@@ -105,10 +127,11 @@ func sendToWriter(dst io.Writer, uri string, localfile bool) error {
 }
 
 func (v *VideoIngest) verifySource(uri string) error {
-
+	var format *youtube.Format
+	formatList := []string{"medium", "large", "720p"}
 	if strings.HasPrefix(uri, "http") {
 		v.localfile = false
-		if isYoutubeVideo(uri) {
+		if isYoutubeDomain(uri) {
 			client := youtube.Client{}
 			video, err := client.GetVideo(uri)
 			if err != nil {
@@ -116,7 +139,17 @@ func (v *VideoIngest) verifySource(uri string) error {
 			}
 
 			formats := video.Formats.WithAudioChannels()
-			stream, err := client.GetStreamURL(video, &formats[1])
+
+			for _, fl := range formatList {
+				if f := formats.FindByQuality(fl); f != nil {
+					format = f
+					break
+				}
+			}
+			if format == nil {
+				return fmt.Errorf("unable to find a valid format")
+			}
+			stream, err := client.GetStreamURL(video, format)
 			if err != nil {
 				return err
 			}
@@ -206,14 +239,17 @@ func NewVideoIngest(uri string, dst string) (*VideoIngest, error) {
 		for _, uri := range ingest.uri {
 			lout.Printf("VideoIngest: process uri: %s", uri)
 			err = sendToWriter(dst, uri, ingest.localfile)
+			lout.Printf("Send to Writer finish: %v", err)
 			if err != nil {
 				lerr.Printf("VideoIngest: process with error: %v", err)
+
 				if ingest.ffmpeg.IsRunning() {
 					ingest.ffmpeg.StopAndWait()
 				} else {
 					ingest.ffmpeg.Wait()
 				}
 				ingest.Output <- err
+				os.Remove(ingest.dst)
 				goto end_loop
 			}
 		}

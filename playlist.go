@@ -62,6 +62,29 @@ func (p *Playlist) Append(asset *Asset) string {
 	return asset.Id
 }
 
+func (p *Playlist) GetAssetNameById(id string) string {
+	e, _ := p.getListElementByAssetId(id)
+	if e != nil {
+		return e.Value.(*Asset).Name
+	}
+	e, _ = p.getListElementByAssetIdInReproduced(id)
+	if e != nil {
+		return e.Value.(*Asset).Name
+	}
+	return ""
+}
+
+func (p *Playlist) getListElementByAssetIdInReproduced(id string) (*list.Element, int) {
+	i := 0
+	for e := p.videoQueue.Front(); e != nil; e = e.Next() {
+		if e.Value.(*Asset).Id == id {
+			return e, i
+		}
+		i++
+	}
+	return nil, -1
+}
+
 func (p *Playlist) getListElementByAssetId(id string) (*list.Element, int) {
 	i := 0
 	for e := p.videoQueue.Front(); e != nil; e = e.Next() {
@@ -197,6 +220,10 @@ func (p *Playlist) Len() int {
 		i = 1
 	}
 	return p.videoQueue.Len() + p.reproduced.Len() + i
+}
+
+func (p *Playlist) InQueue() int {
+	return p.videoQueue.Len()
 }
 
 func (p *Playlist) Map() map[string]interface{} {

@@ -47,6 +47,7 @@ var (
 		"44100",
 		"-ac",
 		"2",
+		"-ignore_unknown",
 		"-strict",
 		"experimental",
 		"-f", "tee", "-map", "0:v", "-map", "0:a?",

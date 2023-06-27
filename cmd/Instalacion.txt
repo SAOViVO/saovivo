@@ -1,0 +1,19 @@
+Para ejecutar la aplicación tenés que hacer doble click sobre el archivo saovivo.exe
+
+Es posible que aparezcan 2 ventanas de windows sobre la prevención de que el archivo sea un virus, te contamos que SAOViVO es una aplicación hecha con fondos de Google através del GNI (Google News Initiative) y buscamos ser lo más transparentes posibles con el uso. Más allá del financiamiento, Google ni ninguna de sus empresas no cumple ningún rol en el desarrollo de la aplicación.
+
+La aplicación NO COMPARTE CON NADIE NINGUNA DATA PERSONAL DE USO.
+
+Según como esté configurado el windows donde se esté ejecutando la app, está la posibilidad que Windows "ponga en cuarentena" el archivo que ejecuta SAOViVO.
+
+En caso de que pase esto o de que te aparezcan ventanas de precaución de Windows al ejecutar SAOViVO, en este link tenés un tutorial de cómo instalar la app:
+
+https://youtu.be/IeqOs9CPoaE
+
+Las ventanas de prevención de windows son dos:
+1) Una ventana azul que dice "WINDOWS PROTEGIÓ TU PC", en el texto debajo está la opción subrayada que dice "Más información". Al dar el click ahí te habilita un botón abajo que dice "Ejecutar de todas formas", presionalo.
+2) Una segunda ventana que pide permiso para que la aplicación pueda pasar el firewall de windows, debés tocar en "permitir acceso".
+
+Eso es todo. Cualquier duda no dudes en escribirnos a hola@saovivo.com
+
+GRACIAS POR USAR LA APLICACION!

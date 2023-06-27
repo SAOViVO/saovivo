@@ -20,17 +20,29 @@ func validExtension(filename string) bool {
 	return strings.HasSuffix(filename, ".mp4")
 }
 
-func (f *FileReceiver) GetRemote(url string) (*Asset, error) {
-	if !isYoutubeVideo(url) {
+func (f *FileReceiver) GetRemote(url string) ([]*Asset, error) {
+	var urls []string
+	if !isYoutubeDomain(url) {
 		return nil, fmt.Errorf("the video is not a youtube content")
 	}
-	client := youtube.Client{}
-	video, err := client.GetVideo(url)
-	if err != nil {
-		return nil, err
+	if playlist := isYoutubePlaylist(url); playlist != nil {
+		urls = getYoutubeUrlsFromPlaylist(playlist)
+	} else {
+		urls = []string{url}
 	}
-	duration := fmt.Sprintf("%2.f", video.Duration.Seconds())
-	return NewAsset(video.Title, url, duration), nil
+
+	assets := []*Asset{}
+
+	client := youtube.Client{}
+	for _, u := range urls {
+		video, err := client.GetVideo(u)
+		if err != nil {
+			return nil, err
+		}
+		duration := fmt.Sprintf("%2.f", video.Duration.Seconds())
+		assets = append(assets, NewAsset(video.Title, u, duration))
+	}
+	return assets, nil
 }
 
 func (f *FileReceiver) Recv(r *http.Request) ([]*Asset, error) {
