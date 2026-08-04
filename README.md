@@ -80,10 +80,17 @@ La emisión sale a 1280×720, 30 fps, H.264 + AAC y 4.5 Mbps. Un publicador pers
 
 - [Privacidad](PRIVACY.md)
 - [Política de seguridad](SECURITY.md)
+- [Code signing policy](CODE_SIGNING_POLICY.md)
 - [Dependencias y licencias de terceros](THIRD_PARTY_NOTICES.md)
 - [Autores y mantenimiento](AUTHORS.md)
 
 SAOViVO se distribuye bajo `GPL-3.0-or-later`. Consultá [LICENSE](LICENSE) para ver el texto completo.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Las publicaciones oficiales para Windows siguen la [política de firma de código de SAOViVO](CODE_SIGNING_POLICY.md), que identifica los artefactos elegibles, los roles del proyecto, el build verificable en GitHub Actions y la aprobación manual requerida para cada firma.
 
 ## Participar
 

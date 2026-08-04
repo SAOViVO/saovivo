@@ -24,6 +24,12 @@ SAOViVO 2.0 no garantiza migración automática de colas o configuraciones de in
 
 Esta primera publicación puede mostrar `Editor desconocido` porque el certificado de firma se solicitará a SignPath Foundation después de publicar el proyecto. Verificá los hashes SHA-256 incluidos en este Release.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Las publicaciones oficiales siguen la [política de firma de código de SAOViVO](../CODE_SIGNING_POLICY.md). Cada solicitud de firma requiere aprobación manual y debe corresponder a artefactos construidos desde el repositorio público mediante GitHub Actions.
+
 ## Contacto
 
 Mantenedor: [Nicolás Russo (`IKSNicoR`)](https://github.com/IKSNicoR)
