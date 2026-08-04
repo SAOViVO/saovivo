@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="SAOVIVO_Leyenda" data-name="SAOVIVO Leyenda" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #00edff;
+        font-family: Carbon-Bold, Carbon;
+        font-size: 50.82px;
+        font-weight: 700;
+      }
+    </style>
+  </defs>
+  <text id="SAOViVO_turquesa" data-name="SAOViVO turquesa" class="cls-1" transform="translate(1061.9597 691.5828)"><tspan x="0" y="0">SAOViVO</tspan></text>
+</svg>

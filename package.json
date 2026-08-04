@@ -1,0 +1,69 @@
+{
+  "name": "saovivo",
+  "version": "2.0.0",
+  "description": "Colas de archivos locales y videos de YouTube para transmitir en vivo de forma continua.",
+  "main": "src/main.js",
+  "author": {
+    "name": "Nicolás Russo",
+    "email": "saovivoapp@gmail.com",
+    "url": "https://github.com/IKSNicoR"
+  },
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "test": "node --test",
+    "assets:brand": "node scripts/generate-brand-outlines.js",
+    "assets:github": "electron scripts/generate-github-brand-assets.js",
+    "assets:installer": "electron scripts/generate-installer-assets.js",
+    "dist": "electron-builder --win portable",
+    "dist:installer": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "opentype.js": "^1.3.4"
+  },
+  "build": {
+    "appId": "com.saovivo.desktop",
+    "productName": "SAOViVO",
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "files": [
+      "src/**/*",
+      "package.json",
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "win": {
+      "icon": "build/SAOViVO.ico",
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "SAOViVO-${version}-portable.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": [
+        "es_ES"
+      ],
+      "displayLanguageSelector": false,
+      "installerIcon": "build/SAOViVO.ico",
+      "uninstallerIcon": "build/SAOViVO.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "installerHeader": null,
+      "include": "build/installer.nsh",
+      "artifactName": "SAOViVO-Setup-${version}.${ext}",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": true
+    }
+  }
+}

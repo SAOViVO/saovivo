@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; connect-src 'none';">
+  <title>SAOViVO</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="window-titlebar"><span>SAOViVO</span></div>
+  <main class="app-shell">
+    <aside class="activity-bar" aria-label="Navegación">
+      <button id="queueNav" class="activity-button active" title="Cola" aria-label="Cola">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      </button>
+      <button id="settingsButton" class="activity-button" title="Configuración" aria-label="Configuración">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+      </button>
+    </aside>
+
+    <section class="stack-column">
+      <form id="addForm" class="add-form">
+        <label for="urlInput">AGREGAR CONTENIDO</label>
+        <div class="input-row">
+          <input id="urlInput" type="url" autocomplete="off" placeholder="Pegá un link de YouTube…" required>
+          <button id="addButton" type="submit" class="icon-submit" title="Agregar link de YouTube" aria-label="Agregar link de YouTube a la cola">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button id="addLocalButton" type="button" class="local-submit" title="Agregar archivos MP4" aria-label="Agregar archivos MP4 desde esta computadora">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h7l2 2h9v10H3v-12Z"/></svg>
+            <span>ARCHIVOS</span>
+          </button>
+        </div>
+      </form>
+
+      <div id="queueList" class="queue-list" aria-live="polite"></div>
+
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5Z"/></svg>
+        </div>
+        <h2>Tu cola está vacía</h2>
+        <p>Pegá un link de YouTube o agregá archivos MP4 desde esta computadora.</p>
+      </div>
+
+      <footer class="stream-controls" aria-label="Controles y resumen de la cola">
+        <button id="modifyButton" class="footer-command modify-command">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 6.3 3 3M4 20l3.5-.7L19 7.8a2.1 2.1 0 0 0-3-3L4.7 16.5 4 20Z"/></svg>
+          <span>MODIFY STACK</span>
+        </button>
+        <div class="transport-controls" aria-label="Controles de reproducción">
+          <button id="previousButton" class="transport-button" title="Video anterior" aria-label="Reproducir el video anterior">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 6 9 12l9 6V6Z"/></svg>
+          </button>
+          <button id="streamButton" class="stream-button">
+            <i></i><span>START STREAM</span>
+          </button>
+          <button id="nextButton" class="transport-button" title="Siguiente video" aria-label="Reproducir el siguiente video">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 6l9 6-9 6V6Z"/></svg>
+          </button>
+          <button id="loopButton" class="loop-button active" aria-pressed="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>
+            <span>LOOP ON</span>
+          </button>
+        </div>
+        <div class="stream-summary">
+          <small id="queueFooterCount">0 VIDEOS</small>
+          <span id="queueDuration">0 MIN</span>
+        </div>
+      </footer>
+    </section>
+
+    <aside class="notifications-column">
+      <header class="notifications-header">
+        <span>OUTPUT</span>
+        <button id="clearNotifications" title="Limpiar" aria-label="Limpiar notificaciones">×</button>
+      </header>
+      <section id="operationalAlert" class="operational-alert hidden" role="status" aria-live="assertive">
+        <div class="operational-alert-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5m0 3v.1"/></svg>
+        </div>
+        <div class="operational-alert-copy">
+          <strong id="operationalAlertLabel">ATENCIÓN</strong>
+          <p id="operationalAlertMessage"></p>
+        </div>
+        <button id="dismissOperationalAlert" type="button" title="Ocultar aviso" aria-label="Ocultar aviso">×</button>
+      </section>
+      <div id="nowPlaying" class="now-playing hidden">
+        <div class="live-label"><i></i> SALIDA RTMPS ACTIVA</div>
+        <div class="now-playing-thumb">
+          <img id="nowPlayingImage" alt="">
+          <div id="nowPlayingPlaceholder" class="now-playing-placeholder media-hidden" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 6.5h7l2 2h9v10H3v-12Z"/><path d="m10 11 5 3-5 3v-6Z"/></svg>
+            <span>ARCHIVO LOCAL</span>
+          </div>
+        </div>
+        <strong id="nowPlayingTitle"></strong>
+        <div class="progress-track"><div id="videoProgress"></div></div>
+        <span id="videoTime">00:00 / 00:00</span>
+      </div>
+      <div id="notificationList" class="notification-list"></div>
+      <div id="notificationsEmpty" class="notifications-empty">
+        <span>Todo tranquilo por acá.</span>
+        <small>Te avisaremos cuando ocurra algo.</small>
+      </div>
+    </aside>
+  </main>
+
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-card">
+      <button id="closeSettings" class="modal-close" aria-label="Cerrar">×</button>
+      <p class="eyebrow">CONFIGURACIÓN</p>
+      <h2 id="settingsTitle">Conectar con YouTube</h2>
+      <p class="modal-copy">Pegá la clave de transmisión que aparece en YouTube Studio. Queda guardada de forma segura sólo en esta computadora.</p>
+      <label for="streamKeyInput">STREAM KEY DE YOUTUBE</label>
+      <div class="key-row">
+        <input id="streamKeyInput" type="password" autocomplete="off" placeholder="xxxx-xxxx-xxxx-xxxx">
+        <button id="toggleKey" type="button">VER</button>
+      </div>
+      <button id="saveSettings" class="save-button">GUARDAR CONFIGURACIÓN</button>
+      <div class="privacy-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v11H5V10Z"/></svg>
+        Nunca mostramos ni enviamos tu clave a otro lugar que no sea YouTube.
+      </div>
+      <section class="data-tools">
+        <div class="data-tools-heading">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h7l2 2h9v10H3v-12Z"/></svg>
+          <div><strong>SAOViVO DATA</strong><small>Logs operativos y diagnóstico de transmisiones.</small></div>
+        </div>
+        <button id="openDataFolder" class="data-folder-button">ABRIR CARPETA</button>
+      </section>
+      <section class="brand-version-strip" aria-label="SAOViVO y versión del software">
+        <div class="brand-signature" aria-label="SAOViVO">
+          <img src="assets/brand/SAOViVO_Logo_Turquesa.svg" alt="">
+          <img src="assets/brand/SAOViVO_Leyenda_Turquesa_Outlined.svg" alt="SAOViVO">
+        </div>
+        <div id="appVersion" class="brand-version">VERSIÓN —</div>
+      </section>
+    </div>
+  </div>
+
+  <div id="mediaConfirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="mediaConfirmTitle">
+    <div class="modal-card confirmation-card">
+      <p class="eyebrow">REVISAR CONTENIDO</p>
+      <h2 id="mediaConfirmTitle"></h2>
+      <p id="mediaConfirmMessage" class="modal-copy"></p>
+      <div class="confirmation-actions">
+        <button id="cancelMedia" type="button">CANCELAR</button>
+        <button id="acceptMedia" type="button" class="save-button">AGREGAR A LA COLA</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stopConfirmModal" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="stopConfirmTitle" aria-describedby="stopConfirmMessage">
+    <div class="modal-card confirmation-card stop-confirm-card">
+      <p class="eyebrow">CONFIRMAR ACCIÓN</p>
+      <h2 id="stopConfirmTitle">¿Seguro que querés terminar el vivo?</h2>
+      <p id="stopConfirmMessage" class="modal-copy">Si terminás ahora, SAOViVO dejará de enviar señal a YouTube.</p>
+      <div class="confirmation-actions stop-confirm-actions">
+        <button id="continueStream" type="button">SEGUIR TRANSMITIENDO</button>
+        <button id="confirmStop" type="button" class="danger-button">TERMINAR EL VIVO</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="feedback-policy.js"></script>
+  <script src="queue-policy.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Logo" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: url(#linear-gradient-2);
+      }
+
+      .cls-2 {
+        fill: #fff;
+      }
+
+      .cls-3 {
+        fill: url(#linear-gradient);
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="656.64" y1="599.24" x2="1212.93" y2="599.24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00edff"/>
+      <stop offset="1" stop-color="#03afba"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="791.74" y1="474.45" x2="1261.02" y2="474.45" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#03afba"/>
+      <stop offset="1" stop-color="#00edff"/>
+    </linearGradient>
+  </defs>
+  <g id="LOGO_turquesa" data-name="LOGO turquesa">
+    <polyline id="Sombra_intermedia" data-name="Sombra intermedia" class="cls-2" points="791.74 504.11 874.27 557.76 925.3 503.55 1261.02 503.55 1261.02 503.55 1188.53 531.54 1212.93 510.35 944.28 510.35 882.01 575.71 791.74 506.91"/>
+    <polygon id="V_con_degradé" data-name="V con degradé" class="cls-3" points="656.64 506.91 791.74 506.91 882.01 575.71 944.28 510.35 1212.93 510.35 1019.41 691.58 814.61 691.58 656.64 506.91"/>
+    <polyline id="S_con_degradé" data-name="S con degradé" class="cls-1" points="882.02 391.15 1154.22 391.15 1261.02 503.55 925.3 503.55 874.27 557.76 791.74 504.11"/>
+  </g>
+</svg>
