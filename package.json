@@ -16,8 +16,8 @@
     "assets:brand": "node scripts/generate-brand-outlines.js",
     "assets:github": "electron scripts/generate-github-brand-assets.js",
     "assets:installer": "electron scripts/generate-installer-assets.js",
-    "dist": "electron-builder --win portable",
-    "dist:installer": "electron-builder --win nsis"
+    "dist": "electron-builder --win portable --publish never",
+    "dist:installer": "electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "ffmpeg-static": "^5.2.0"
