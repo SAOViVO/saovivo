@@ -16,6 +16,7 @@ El texto GPL aplicable se incluye en `LICENSE`. Las bibliotecas integradas por e
 - Descargado bajo demanda desde [`yt-dlp/yt-dlp`](https://github.com/yt-dlp/yt-dlp).
 - Licencia: The Unlicense.
 - No se incluye dentro del repositorio ni se descarga cuando la cola utiliza solamente archivos locales.
+- SAOViVO descarga únicamente el asset estable aprobado en `src/runtime/yt-dlp-approved.json`, verifica su SHA-256 y conserva una copia anterior para rollback.
 
 ## Electron
 

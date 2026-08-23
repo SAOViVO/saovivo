@@ -2,11 +2,10 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
-const https = require('node:https');
 const { powerSaveBlocker } = require('electron');
 const { sourceTypeOf, isSupportedLocalPath, localItemId } = require('./media-source');
+const { YtDlpRuntimeManager } = require('./ytdlp-runtime');
 
-const YTDLP_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
 const RTMP_URL = 'rtmps://a.rtmps.youtube.com:443/live2';
 const PRIVATE_ACCOUNT_PLAYLIST_MESSAGE = 'Esta playlist es privada de tu cuenta de YouTube. SAOViVO no accede a tu cuenta. Creá una playlist pública o no listada y pegá ese enlace.';
 
@@ -73,6 +72,17 @@ class StreamEngine {
     this.lastLoggedVideo = -1;
     this.workers = new Set();
     this.shuttingDown = false;
+    this.ytDlpRuntime = new YtDlpRuntimeManager({
+      basePath: this.basePath,
+      binaryPath: this.ytDlpPath,
+      bundledManifestPath: path.join(__dirname, 'runtime', 'yt-dlp-approved.json'),
+      runCommand: (...args) => this.run(...args),
+      logger: (scope, detail) => this.logTechnical(scope, detail),
+      onStatus: (status) => {
+        if (status.type === 'download') this.emit('download', 'Actualizando la conexión con YouTube…');
+        if (status.type === 'ready') this.emit('success', 'La conexión con YouTube quedó actualizada.');
+      }
+    });
   }
 
   status() {
@@ -282,41 +292,9 @@ class StreamEngine {
     }
   }
 
-  async ensureYouTubeRuntime() {
+  async ensureYouTubeRuntime(options = {}) {
     await this.ensureCoreRuntime();
-    if (!fs.existsSync(this.ytDlpPath)) {
-      this.emit('download', 'Preparando el acceso a YouTube por primera vez…');
-      await this.downloadFile(YTDLP_URL, this.ytDlpPath);
-      this.emit('success', 'SAOViVO ya puede leer tus videos de YouTube.');
-    }
-  }
-
-  downloadFile(url, destination, redirects = 0) {
-    return new Promise((resolve, reject) => {
-      if (redirects > 8) return reject(new Error('No se pudo completar la descarga inicial.'));
-      const temp = `${destination}.download`;
-      const request = https.get(url, { headers: { 'User-Agent': 'SAOViVO/0.1' } }, (response) => {
-        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-          response.resume();
-          return this.downloadFile(response.headers.location, destination, redirects + 1).then(resolve, reject);
-        }
-        if (response.statusCode !== 200) {
-          response.resume();
-          return reject(new Error('No se pudo descargar el componente de YouTube.'));
-        }
-        const file = fs.createWriteStream(temp);
-        response.pipe(file);
-        file.on('finish', () => file.close(async () => {
-          try {
-            await fsp.rename(temp, destination);
-            resolve();
-          } catch (error) { reject(error); }
-        }));
-        file.on('error', reject);
-      });
-      request.on('error', reject);
-      request.setTimeout(30000, () => request.destroy(new Error('La descarga inicial tardó demasiado.')));
-    });
+    return this.ytDlpRuntime.ensure(options);
   }
 
   validateYouTubeUrl(value) {
@@ -368,10 +346,17 @@ class StreamEngine {
     if (/deleted|removed|unavailable|copyright|blocked|not available/i.test(text)) {
       return { code: 'VIDEO_UNAVAILABLE', permanent: true, message: 'El video fue eliminado o no está disponible.' };
     }
+    if (this.isRuntimeCompatibilityFailure(text)) {
+      return { code: 'YOUTUBE_RUNTIME', permanent: false, message: 'La conexión con YouTube necesita una actualización. SAOViVO ya intentó actualizarla; probá nuevamente más tarde.' };
+    }
     if (/network|timed out|timeout|connection|resolve|temporary|429|\b5\d\d\b/i.test(text)) {
       return { code: 'YOUTUBE_NETWORK', permanent: false, message: 'YouTube no respondió. Podés reintentar sin perder lo que ya se agregó.' };
     }
     return { code: 'YOUTUBE_TECHNICAL', permanent: false, message: 'YouTube no pudo procesar este contenido. Podés reintentar.' };
+  }
+
+  isRuntimeCompatibilityFailure(detail) {
+    return /(?:HTTP Error\s*)?403\b|403 Forbidden|nsig extraction failed|signature extraction failed|player client|precondition check failed/i.test(String(detail || ''));
   }
 
   classifyPlaylistEntry(entry) {
@@ -754,6 +739,46 @@ class StreamEngine {
     return path.join(this.mediaPath, `${safeId}.stream-v3.mp4`);
   }
 
+  async cleanupYouTubeDownloadArtifacts(safeId) {
+    let names = [];
+    try { names = await fsp.readdir(this.mediaPath); } catch { return; }
+    const owned = names.filter((name) => name.startsWith(`${safeId}.source.`));
+    await Promise.all(owned.map((name) => fsp.unlink(path.join(this.mediaPath, name)).catch(() => {})));
+  }
+
+  async runYouTubeDownloadWithRecovery(item, args, options, safeId) {
+    try {
+      return await this.run(this.ytDlpPath, args, options);
+    } catch (firstError) {
+      const detail = firstError.details || firstError.message;
+      if (!this.isRuntimeCompatibilityFailure(detail)) throw firstError;
+      this.logTechnical('YOUTUBE DESCARGA — RECUPERACIÓN DE RUNTIME', JSON.stringify({
+        itemId: item.id,
+        reason: 'runtime_compatibility',
+        firstExitCode: firstError.exitCode ?? null,
+        retry: 1
+      }, null, 2));
+      try {
+        await this.ensureYouTubeRuntime({ forceCheck: true });
+      } catch (updateError) {
+        this.logTechnical('YOUTUBE RUNTIME — ACTUALIZACIÓN ANTES DEL REINTENTO FALLÓ', updateError.stack || updateError.message);
+      }
+      await this.cleanupYouTubeDownloadArtifacts(safeId);
+      try {
+        return await this.run(this.ytDlpPath, args, options);
+      } catch (retryError) {
+        retryError.runtimeRecoveryAttempted = true;
+        retryError.details = retryError.details || retryError.message;
+        this.logTechnical('YOUTUBE DESCARGA — REINTENTO ÚNICO FALLÓ', JSON.stringify({
+          itemId: item.id,
+          exitCode: retryError.exitCode ?? null,
+          reason: 'runtime_compatibility'
+        }, null, 2));
+        throw retryError;
+      }
+    }
+  }
+
   async downloadVideo(item) {
     await this.ensureYouTubeRuntime();
     const safeId = String(item.id).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -763,13 +788,14 @@ class StreamEngine {
     const output = path.join(this.mediaPath, `${safeId}.source.%(ext)s`);
     let downloadProgress = 0;
     try {
-      await this.run(this.ytDlpPath, [
+      const args = [
         '--no-playlist', '--newline', '--no-warnings',
         '--ffmpeg-location', this.ffmpegPath,
         '-f', 'bv*[vcodec^=avc1][height<=720]+ba[ext=m4a]/b[vcodec^=avc1][height<=720]/b[height<=720]',
         '--merge-output-format', 'mp4', '--remux-video', 'mp4',
         '-o', output, item.url
-      ], {
+      ];
+      await this.runYouTubeDownloadWithRecovery(item, args, {
         timeout: 60 * 60 * 1000,
         timeoutMessage: 'La descarga desde YouTube tardó demasiado. Probá otra vez.',
         onLine: (line) => {
@@ -779,7 +805,7 @@ class StreamEngine {
             this.notify({ type: 'prepare-progress', status: 'preparing', phase: 'downloading', itemId: item.id, progress: downloadProgress });
           }
         }
-      });
+      }, safeId);
     } catch (error) {
       this.logTechnical(`Descarga fallida: ${item.id} ${item.title}`, error.details || error.stack || error.message);
       error.details = error.details || error.message;

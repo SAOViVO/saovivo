@@ -1,6 +1,6 @@
 {
   "name": "saovivo",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Colas de archivos locales y videos de YouTube para transmitir en vivo de forma continua.",
   "main": "src/main.js",
   "author": {

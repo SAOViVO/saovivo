@@ -2,7 +2,7 @@
 
 App de escritorio para convertir archivos MP4 locales, videos propios de YouTube o una cola combinada en una transmisión en vivo continua.
 
-**Versión vigente: SAOViVO 2.0 para Windows.**
+**Versión vigente: SAOViVO 2.0.1 para Windows.**
 
 ## Proyecto y mantenimiento
 
@@ -16,8 +16,8 @@ Contacto actual del proyecto: [saovivoapp@gmail.com](mailto:saovivoapp@gmail.com
 
 La versión vigente se publica en [GitHub Releases](https://github.com/SAOViVO/saovivo/releases/latest):
 
-- `SAOViVO-Setup-2.0.0.exe`: instalador asistido.
-- `SAOViVO-2.0.0-portable.exe`: versión portable.
+- `SAOViVO-Setup-2.0.1.exe`: instalador asistido.
+- `SAOViVO-2.0.1-portable.exe`: versión portable.
 
 La primera publicación puede no contar todavía con firma digital. En ese caso Windows mostrará `Editor desconocido`; los hashes SHA-256 de cada archivo se publicarán en las notas del Release. La firma gratuita para las siguientes builds se gestionará con SignPath Foundation.
 
@@ -46,6 +46,7 @@ El segundo toque sobre el botón (**STOP STREAM**) termina la señal. Con **LOOP
 - SAOViVO nunca modifica, mueve ni elimina el archivo local original: genera una copia temporal normalizada para transmitir.
 - Si un archivo local fue movido o eliminado al reabrir, la cola permite volver a ubicarlo o quitarlo.
 - Una cola exclusivamente local usa FFmpeg y no descarga ni ejecuta `yt-dlp`.
+- El componente `yt-dlp` se revisa como máximo una vez por día cuando se usa YouTube. SAOViVO instala únicamente una versión estable aprobada, verifica su SHA-256 y conserva una copia anterior para rollback.
 - La computadora no entra en suspensión mientras el stream está activo, pero la app no puede evitar un corte eléctrico o el cierre forzado de Windows.
 - La clave queda cifrada mediante la protección de credenciales de Windows y se guarda sólo en la PC.
 - Las fuentes se comprueban y preparan en el orden de la cola. Las copias de trabajo son temporales y se eliminan al cerrar SAOViVO.

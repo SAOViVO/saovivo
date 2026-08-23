@@ -22,7 +22,11 @@ Antes de tocar la apariencia del producto, leer `docs/brand/IDENTIDAD_BASE.md`. 
 6. FFmpeg concatena los archivos temporales reproducibles y mantiene una conexión RTMPS continua.
 7. Al cerrar, se elimina `SAOViVO Data/temp`; los originales y los logs permanentes quedan intactos.
 
-`ensureCoreRuntime()` valida únicamente FFmpeg. `ensureYouTubeRuntime()` descarga `yt-dlp` bajo demanda y solo puede alcanzarse desde metadata o preparación de fuentes YouTube.
+`ensureCoreRuntime()` valida únicamente FFmpeg. `ensureYouTubeRuntime()` sólo puede alcanzarse desde metadata o preparación de fuentes YouTube. El runtime se rige por `src/runtime/yt-dlp-approved.json`: consulta diariamente la copia aprobada de `main`, valida canal estable, URL oficial, SHA-256 y `--version`, conserva `yt-dlp.previous.exe` y hace rollback si la instalación no supera el control posterior.
+
+Una descarga VOD que falla con `403` u otra señal compatible con runtime obsoleto fuerza un control del manifiesto y se reintenta exactamente una vez. Metadata, playlists, archivos locales y fuentes Live no comparten ese reintento.
+
+El monitor `.github/workflows/youtube-runtime-watch.yml` revisa las fuentes oficiales y genera un informe; nunca modifica el manifiesto ni publica. La aprobación y el rollback están documentados en `docs/runbooks/YTDLP_UPDATE_ROLLBACK.md`.
 
 ## Comandos
 
