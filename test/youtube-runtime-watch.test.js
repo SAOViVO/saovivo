@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { OFFICIAL_SOURCES, VIDEO_CANARY_ARGS, isYouTubeUrl, classifyReport, reportMarkdown, runWatch } = require('../scripts/check-youtube-runtime');
+const { OFFICIAL_SOURCES, VIDEO_CANARY_ARGS, FINGERPRINT_SCHEMA_VERSION, normalizedFingerprint, isYouTubeUrl, classifyReport, reportMarkdown, runWatch } = require('../scripts/check-youtube-runtime');
 
 test('daily watch covers the three official YouTube sources', () => {
   assert.deepEqual(OFFICIAL_SOURCES.map((source) => source.url), [
@@ -11,6 +11,66 @@ test('daily watch covers the three official YouTube sources', () => {
     'https://developers.google.com/youtube/v3/live/revision_history',
     'https://developers.google.com/youtube/terms/revision-history'
   ]);
+});
+
+test('revision fingerprint ignores dynamic HTML while preserving visible revision text', () => {
+  const firstRender = `
+    <html data-build="alpha"><script nonce="one">window.requestId = 'A'</script><main>
+      <article class="devsite-article" data-render="100">
+        <h1 id="revision-history">Revision History</h1>
+        <h2>Page Summary</h2><p>Generated summary request A.</p>
+        <h2 id="august-6-2026">August 6, 2026</h2>
+        <p>The API added support for a new field &amp; updated its documentation.</p>
+        <devsite-page-rating>Request A</devsite-page-rating>
+        <footer>Last updated 2026-08-23 UTC.</footer>
+      </article>
+    </main></html>`;
+  const secondRender = `
+    <html data-build="beta"><script nonce="two">window.requestId = 'B'</script><main>
+      <article class="devsite-article compact" data-render="200">
+        <h1 data-tracking-id="changed">Revision History</h1>
+        <h2>Page Summary</h2><p>Generated summary request B with different visible text.</p>
+        <h2 id="generated-984">August 6, 2026</h2>
+        <p>The API added support for a new field &amp; updated its documentation.</p>
+        <devsite-page-rating>Request B</devsite-page-rating>
+        <footer>Last updated 2026-08-24 UTC.</footer>
+      </article>
+    </main></html>`;
+
+  assert.equal(normalizedFingerprint(firstRender), normalizedFingerprint(secondRender));
+});
+
+test('revision fingerprint changes when the visible revision content changes', () => {
+  const before = '<article><h2>August 6, 2026</h2><p>The API added support for field A.</p></article>';
+  const after = '<article><h2>August 6, 2026</h2><p>The API added support for field B.</p></article>';
+  assert.notEqual(normalizedFingerprint(before), normalizedFingerprint(after));
+});
+
+test('semantic fingerprint schema starts a clean baseline instead of comparing legacy HTML hashes', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'saovivo-fingerprint-schema-'));
+  const outputPath = path.join(root, 'report.md');
+  const statePath = path.join(root, 'state.json');
+  await fs.writeFile(statePath, JSON.stringify({
+    latestStableVersion: '2026.08.19',
+    sourceFingerprints: Object.fromEntries(OFFICIAL_SOURCES.map((source) => [source.id, 'a'.repeat(64)]))
+  }));
+  try {
+    const result = await runWatch({
+      outputPath,
+      statePath,
+      approvedPath: path.resolve(__dirname, '..', 'src', 'runtime', 'yt-dlp-approved.json'),
+      fetchTextImpl: async () => '<article><h2>August 6, 2026</h2><p>Stable revision content.</p></article>',
+      fetchJsonImpl: async () => ({ tag_name: '2026.08.19', body: '', assets: [{ name: 'yt-dlp.exe', digest: `sha256:${'b'.repeat(64)}` }] }),
+      canaryCheckImpl: async () => ({ status: 'omitida' }),
+      videoCanaryUrl: '',
+      playlistCanaryUrl: ''
+    });
+    const state = JSON.parse(await fs.readFile(statePath, 'utf8'));
+    assert.equal(result.classification, 'VERDE');
+    assert.equal(state.fingerprintSchemaVersion, FINGERPRINT_SCHEMA_VERSION);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
 
 test('daily watch classifies actionable yt-dlp and canary changes without publishing', () => {
