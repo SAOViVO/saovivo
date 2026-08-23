@@ -11,19 +11,49 @@ const OFFICIAL_SOURCES = [
   { id: 'youtube-terms', name: 'YouTube API Services Terms', url: 'https://developers.google.com/youtube/terms/revision-history' }
 ];
 const VIDEO_CANARY_ARGS = ['--test', '--no-playlist', '--no-warnings', '-f', 'bv*[height<=720]/bv*/ba'];
+const FINGERPRINT_SCHEMA_VERSION = 2;
 
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-function normalizedFingerprint(value) {
-  const meaningfulText = String(value || '')
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
+function decodeHtmlEntities(value) {
+  const named = { amp: '&', apos: "'", gt: '>', lt: '<', nbsp: ' ', quot: '"' };
+  return String(value || '').replace(/&(#x[\da-f]+|#\d+|amp|apos|gt|lt|nbsp|quot);/gi, (match, entity) => {
+    if (entity[0] === '#') {
+      const hexadecimal = entity[1]?.toLowerCase() === 'x';
+      const codePoint = Number.parseInt(entity.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
+      try { return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match; } catch { return match; }
+    }
+    return named[entity.toLowerCase()] ?? match;
+  });
+}
+
+function semanticRevisionText(value) {
+  const html = String(value || '');
+  const article = html.match(/<article\b[^>]*>([\s\S]*?)<\/article\s*>/i);
+  const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main\s*>/i);
+  let revisionScope = article?.[1] || main?.[1] || html;
+  for (const heading of revisionScope.matchAll(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]\s*>/gi)) {
+    const headingText = decodeHtmlEntities(heading[1].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}$/i.test(headingText)) {
+      revisionScope = revisionScope.slice(heading.index);
+      break;
+    }
+  }
+  const visibleText = revisionScope
+    .replace(/<!--([\s\S]*?)-->/g, ' ')
+    .replace(/<(script|style|template|noscript|svg|footer|devsite-page-rating|devsite-feedback)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  return decodeHtmlEntities(visibleText)
+    .replace(/\bLast updated\s+\d{4}-\d{2}-\d{2}\s+UTC\.?/gi, ' ')
+    .normalize('NFKC')
     .replace(/\s+/g, ' ')
     .trim();
-  return sha256(meaningfulText);
+}
+
+function normalizedFingerprint(value) {
+  return sha256(semanticRevisionText(value));
 }
 
 function isYouTubeUrl(value) {
@@ -129,16 +159,19 @@ async function runWatch(options = {}) {
   const approved = validateApprovedManifest(JSON.parse(await fsp.readFile(approvedPath, 'utf8')));
   let previous = {};
   try { previous = JSON.parse(await fsp.readFile(statePath, 'utf8')); } catch {}
+  const previousFingerprints = previous.fingerprintSchemaVersion === FINGERPRINT_SCHEMA_VERSION
+    ? previous.sourceFingerprints || {}
+    : {};
   const sources = [];
   const failedSources = [];
   for (const source of OFFICIAL_SOURCES) {
     try {
       const content = await fetchTextImpl(source.url);
       const fingerprint = normalizedFingerprint(content);
-      sources.push({ ...source, status: 'ok', fingerprint, changed: Boolean(previous.sourceFingerprints?.[source.id] && previous.sourceFingerprints[source.id] !== fingerprint) });
+      sources.push({ ...source, status: 'ok', fingerprint, changed: Boolean(previousFingerprints[source.id] && previousFingerprints[source.id] !== fingerprint) });
     } catch {
       failedSources.push(source.id);
-      const savedFingerprint = String(previous.sourceFingerprints?.[source.id] || '').toLowerCase();
+      const savedFingerprint = String(previousFingerprints[source.id] || '').toLowerCase();
       sources.push({ ...source, status: 'failed', fingerprint: /^[a-f0-9]{64}$/.test(savedFingerprint) ? savedFingerprint : null, changed: false });
     }
   }
@@ -177,6 +210,7 @@ async function runWatch(options = {}) {
   await fsp.writeFile(statePath, JSON.stringify({
     checkedAt: data.checkedAt,
     classification,
+    fingerprintSchemaVersion: FINGERPRINT_SCHEMA_VERSION,
     latestStableVersion: latest.version,
     failedSources,
     sourceFingerprints: Object.fromEntries(sources.filter((source) => source.fingerprint).map((source) => [source.id, source.fingerprint]))
@@ -192,4 +226,4 @@ if (require.main === module) runWatch()
     process.exitCode = 1;
   });
 
-module.exports = { OFFICIAL_SOURCES, VIDEO_CANARY_ARGS, normalizedFingerprint, isYouTubeUrl, classifyReport, reportMarkdown, runWatch };
+module.exports = { OFFICIAL_SOURCES, VIDEO_CANARY_ARGS, FINGERPRINT_SCHEMA_VERSION, semanticRevisionText, normalizedFingerprint, isYouTubeUrl, classifyReport, reportMarkdown, runWatch };

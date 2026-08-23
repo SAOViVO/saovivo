@@ -39,6 +39,12 @@ Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $runtime 'yt-dlp.exe')
 
 Nunca copiar al reporte cookies, tokens, stream keys ni URLs firmadas de reproducción.
 
+## Alcance del monitor y los canarios
+
+El workflow diario de GitHub controla las páginas oficiales de revisión de YouTube y los releases estables de `yt-dlp`. Los canarios configurados mediante variables del repositorio son opcionales: YouTube puede bloquear la IP compartida de un runner alojado aunque el video propio esté disponible.
+
+La prueba real de descarga se ejecuta localmente con una URL propia y `--test`, desde una conexión comparable a la de uso de SAOViVO. Un canario omitido o bloqueado en GitHub no reemplaza esa validación local y no debe interpretarse como evidencia de que YouTube acepta o rechaza el runtime.
+
 ## Rollback
 
 El rollback normal es automático si una instalación no supera la verificación. Para un rollback operativo posterior:
