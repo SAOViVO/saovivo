@@ -1,0 +1,51 @@
+name: YouTube runtime watch
+
+on:
+  schedule:
+    - cron: "17 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/cache/restore@v4
+        with:
+          path: .youtube-runtime-watch-state
+          key: youtube-runtime-watch-${{ github.run_id }}
+          restore-keys: |
+            youtube-runtime-watch-
+      - name: Revisar fuentes oficiales, yt-dlp y canary propio
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SAOVIVO_YOUTUBE_CANARY_URL: ${{ vars.SAOVIVO_YOUTUBE_CANARY_URL }}
+          SAOVIVO_YOUTUBE_CANARY_PLAYLIST_URL: ${{ vars.SAOVIVO_YOUTUBE_CANARY_PLAYLIST_URL }}
+          SAOVIVO_WATCH_REPORT: youtube-runtime-report.md
+          SAOVIVO_WATCH_STATE: .youtube-runtime-watch-state/state.json
+        run: node scripts/check-youtube-runtime.js
+      - name: Publicar resultado en el resumen
+        if: always() && hashFiles('youtube-runtime-report.md') != ''
+        shell: pwsh
+        run: Get-Content -LiteralPath 'youtube-runtime-report.md' | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .youtube-runtime-watch-state
+          key: youtube-runtime-watch-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: youtube-runtime-watch-${{ github.run_number }}
+          path: |
+            youtube-runtime-report.md
+            .youtube-runtime-watch-state/state.json
+          if-no-files-found: warn
+          retention-days: 30

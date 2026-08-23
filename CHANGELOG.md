@@ -2,6 +2,15 @@
 
 Todas las diferencias relevantes entre versiones de SAOViVO se registran aquí.
 
+## 2.0.1 — 2026-08-23
+
+- Runtime `yt-dlp` estable aprobado `2026.08.19`, con manifiesto versionado y control diario.
+- Verificación de URL oficial, canal, SHA-256 y versión antes y después de actualizar.
+- Backup verificable y rollback automático ante una instalación fallida.
+- Reintento único de descargas YouTube afectadas por `403` u otra señal compatible con runtime obsoleto.
+- Monitor diario de fuentes oficiales de YouTube y releases de `yt-dlp`, con clasificación y artefacto accionable sin publicación automática.
+- Los archivos locales continúan sin instalar ni ejecutar `yt-dlp`; las fuentes Live no pasan por el reintento de descarga VOD.
+
 ## 2.0.0 — 2026-08-04
 
 - Nueva aplicación de escritorio autocontenida para Windows, reimplementada en Electron.
